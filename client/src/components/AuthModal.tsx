@@ -1,7 +1,9 @@
 import React, { useState } from "react";
 import { api } from "../api";
 import { User } from "../types";
-import { X, Lock, Mail, User as UserIcon } from "lucide-react";
+import { X, Lock, Mail, User as UserIcon, AlertCircle } from "lucide-react";
+import { Button } from "./ui/button";
+import { Alert, AlertDescription } from "./ui/alert";
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -9,7 +11,11 @@ interface AuthModalProps {
   onSuccess: (user: User) => void;
 }
 
-export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => {
+export const AuthModal: React.FC<AuthModalProps> = ({
+  isOpen,
+  onClose,
+  onSuccess,
+}) => {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -48,95 +54,108 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-      <div className="relative w-full max-w-md rounded-2xl bg-slate-900 border border-slate-800 p-6 shadow-2xl">
-        <button
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+      <div className="relative w-full max-w-sm rounded-2xl bg-zinc-950 border border-white/[0.08] p-6 shadow-2xl animate-in fade-in-0 zoom-in-95 duration-200">
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={onClose}
-          className="absolute right-4 top-4 text-slate-400 hover:text-white transition-colors"
+          className="absolute right-3.5 top-3.5 h-7 w-7 text-zinc-500 hover:text-white"
         >
-          <X size={20} />
-        </button>
+          <X size={16} />
+        </Button>
 
-        <h2 className="text-xl font-bold text-white mb-2">
-          {isLogin ? "Welcome Back" : "Create an Account"}
+        <h2 className="text-lg font-bold tracking-tight text-zinc-100 mb-1">
+          {isLogin ? "Welcome Back" : "Create Account"}
         </h2>
-        <p className="text-sm text-slate-400 mb-6">
+        <p className="text-xs text-zinc-400 mb-5">
           {isLogin
-            ? "Sign in to submit solutions and track verdicts."
+            ? "Sign in to evaluate solutions and record submission history."
             : "Register to practice and evaluate algorithms."}
         </p>
 
         {error && (
-          <div className="mb-4 rounded-lg bg-red-500/10 border border-red-500/30 p-3 text-sm text-red-400">
-            {error}
-          </div>
+          <Alert variant="destructive" className="mb-4 py-2.5">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-3.5">
           {!isLogin && (
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">
+              <label className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1">
                 Full Name
               </label>
               <div className="relative">
-                <UserIcon className="absolute left-3 top-3 text-slate-500" size={16} />
+                <UserIcon
+                  className="absolute left-3 top-2.5 text-zinc-500"
+                  size={14}
+                />
                 <input
                   type="text"
                   required
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="Ada Lovelace"
-                  className="w-full rounded-lg bg-slate-800 border border-slate-700 py-2 pl-9 pr-3 text-white text-sm focus:border-emerald-500 focus:outline-none"
+                  placeholder="Linus Torvalds"
+                  className="w-full rounded-lg bg-zinc-900 border border-white/[0.08] py-2 pl-9 pr-3 text-zinc-100 text-xs placeholder-zinc-500 focus:border-white/20 focus:ring-1 focus:ring-white/20 focus:outline-none transition-all"
                 />
               </div>
             </div>
           )}
 
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">
+            <label className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1">
               Email Address
             </label>
             <div className="relative">
-              <Mail className="absolute left-3 top-3 text-slate-500" size={16} />
+              <Mail
+                className="absolute left-3 top-2.5 text-zinc-500"
+                size={14}
+              />
               <input
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="coder@example.com"
-                className="w-full rounded-lg bg-slate-800 border border-slate-700 py-2 pl-9 pr-3 text-white text-sm focus:border-emerald-500 focus:outline-none"
+                placeholder="developer@example.com"
+                className="w-full rounded-lg bg-zinc-900 border border-white/[0.08] py-2 pl-9 pr-3 text-zinc-100 text-xs placeholder-zinc-500 focus:border-white/20 focus:ring-1 focus:ring-white/20 focus:outline-none transition-all"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">
+            <label className="block text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1">
               Password
             </label>
             <div className="relative">
-              <Lock className="absolute left-3 top-3 text-slate-500" size={16} />
+              <Lock
+                className="absolute left-3 top-2.5 text-zinc-500"
+                size={14}
+              />
               <input
                 type="password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full rounded-lg bg-slate-800 border border-slate-700 py-2 pl-9 pr-3 text-white text-sm focus:border-emerald-500 focus:outline-none"
+                className="w-full rounded-lg bg-zinc-900 border border-white/[0.08] py-2 pl-9 pr-3 text-zinc-100 text-xs placeholder-zinc-500 focus:border-white/20 focus:ring-1 focus:ring-white/20 focus:outline-none transition-all"
               />
             </div>
           </div>
 
-          <button
+          <Button
             type="submit"
+            variant="primary"
             disabled={loading}
-            className="w-full rounded-lg bg-emerald-600 hover:bg-emerald-500 font-medium py-2.5 text-white text-sm transition-colors shadow-lg shadow-emerald-900/30 disabled:opacity-50"
+            className="w-full mt-1 text-xs font-semibold"
           >
-            {loading ? "Processing..." : isLogin ? "Sign In" : "Register"}
-          </button>
+            {loading ? "Authenticating..." : isLogin ? "Sign In" : "Register"}
+          </Button>
         </form>
 
-        <div className="mt-4 pt-4 border-t border-slate-800 text-xs text-slate-400 text-center">
-          {isLogin ? "Don't have an account? " : "Already have an account? "}
+        <div className="mt-4 pt-3.5 border-t border-white/[0.06] text-xs text-zinc-400 text-center">
+          {isLogin ? "Need an account? " : "Already registered? "}
           <button
             type="button"
             onClick={() => {
@@ -145,34 +164,37 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
             }}
             className="text-emerald-400 hover:underline font-semibold"
           >
-            {isLogin ? "Sign up" : "Sign in"}
+            {isLogin ? "Register" : "Sign In"}
           </button>
         </div>
 
-        {/* Demo Fast Logins */}
-        <div className="mt-4 pt-4 border-t border-slate-800/80">
-          <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold mb-2 text-center">
+        {/* 1-Click Fast Credentials */}
+        <div className="mt-4 pt-3.5 border-t border-white/[0.06]">
+          <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold mb-2 text-center">
             One-Click Demo Credentials
           </p>
           <div className="flex gap-2">
-            <button
+            <Button
               type="button"
+              variant="outline"
+              size="sm"
               onClick={() => fillDemoUser("user@oj.com", "user123")}
-              className="flex-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs py-1.5 transition-colors"
+              className="flex-1 text-[11px] h-7"
             >
               Demo User
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="outline"
+              size="sm"
               onClick={() => fillDemoUser("admin@oj.com", "admin123")}
-              className="flex-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs py-1.5 transition-colors"
+              className="flex-1 text-[11px] h-7"
             >
               Demo Admin
-            </button>
+            </Button>
           </div>
         </div>
       </div>
     </div>
   );
 };
-
