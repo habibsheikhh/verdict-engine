@@ -1,0 +1,98 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum Verdict {
+  PENDING
+  PROCESSING
+  ACCEPTED
+  WRONG_ANSWER
+  TIME_LIMIT_EXCEEDED
+  MEMORY_LIMIT_EXCEEDED
+  COMPILATION_ERROR
+  RUNTIME_ERROR
+  INTERNAL_ERROR
+}
+
+model User {
+  id          String       @id @default(uuid())
+  email       String       @unique
+  password    String
+  name        String
+  role        Role         @default(USER)
+  submissions Submission[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@map("users")
+}
+
+model Problem {
+  id           String       @id @default(uuid())
+  title        String
+  slug         String       @unique
+  description  String       @db.Text
+  difficulty   Difficulty   @default(EASY)
+  timeLimit    Int          @default(2000) // Execution time limit in milliseconds
+  memoryLimit  Int          @default(256)  // Memory limit in Megabytes
+  templateCode String       @db.Text
+  testCases    TestCase[]
+  submissions  Submission[]
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@map("problems")
+}
+
+model TestCase {
+  id             String   @id @default(uuid())
+  problemId      String
+  problem        Problem  @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  input          String   @db.Text
+  expectedOutput String   @db.Text
+  isHidden       Boolean  @default(true) // false = sample/visible in description, true = hidden for grading
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([problemId])
+  @@map("test_cases")
+}
+
+model Submission {
+  id             String    @id @default(uuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  problemId      String
+  problem        Problem   @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  code           String    @db.Text
+  language       String    @default("cpp")
+  status         Verdict   @default(PENDING)
+  executionTime  Int?      // Max time taken in ms across all test cases
+  memoryUsed     Int?      // Max memory used in KB
+  failedTestCase Int?      // Index of failing testcase (1-based), null if all passed
+  errorMessage   String?   @db.Text // Compiler or runtime error output
+  stdout         String?   @db.Text // Sandbox stdout for debugging
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([problemId])
+  @@map("submissions")
+}
+
