@@ -42,7 +42,10 @@ export const updateProblemSchema = z.object({
 
 export const createSubmissionSchema = z.object({
   problemId: z.string().uuid("Invalid problem ID"),
-  code: z.string().min(1, "Code cannot be empty"),
+  code: z
+    .string()
+    .min(1, "Code cannot be empty")
+    .max(65536, "Source code exceeds 64KB limit (maximum 65536 characters)"),
   language: z.string().default("cpp"),
 });
 

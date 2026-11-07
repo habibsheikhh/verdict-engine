@@ -1,6 +1,5 @@
 import fs from "fs/promises";
 import path from "path";
-import os from "os";
 import { spawn, execFile } from "child_process";
 import { promisify } from "util";
 import { randomUUID } from "crypto";
@@ -28,17 +27,17 @@ export class DockerSandboxExecutor {
 
   constructor(baseTempDir?: string) {
     this.baseTempDir =
-      baseTempDir || path.join(os.tmpdir(), "online-judge-sandboxes");
+      baseTempDir || path.resolve(process.cwd(), ".temp/sandboxes");
   }
 
   public async init(): Promise<void> {
     await fs.mkdir(this.baseTempDir, { recursive: true });
   }
 
-  public async createSandboxDir(): Promise<string> {
+  public async createSandboxDir(submissionId = randomUUID().substring(0, 8)): Promise<string> {
     const sandboxDir = path.join(
       this.baseTempDir,
-      `sub-${Date.now()}-${randomUUID().substring(0, 8)}`
+      `oj-run-${submissionId}-${Date.now()}`
     );
     await fs.mkdir(sandboxDir, { recursive: true });
     return sandboxDir;
@@ -46,22 +45,98 @@ export class DockerSandboxExecutor {
 
   public async cleanupSandbox(sandboxDir: string): Promise<void> {
     try {
-      await fs.rm(sandboxDir, { recursive: true, force: true });
+      let retries = 3;
+      while (retries > 0) {
+        try {
+          await fs.rm(sandboxDir, { recursive: true, force: true });
+          break;
+        } catch (e) {
+          retries--;
+          if (retries === 0) throw e;
+          await new Promise((r) => setTimeout(r, 200));
+        }
+      }
     } catch (err) {
       console.warn(`[Sandbox] Failed to clean up ${sandboxDir}:`, err);
     }
   }
 
+  /**
+   * Zombie Container Sweeper: Forcefully removes any orphaned Docker containers
+   * matching the 'oj-' naming prefix.
+   */
+  public static async cleanupAllJudgeContainers(): Promise<number> {
+    try {
+      const { stdout } = await execFileAsync("docker", [
+        "ps",
+        "-a",
+        "--filter",
+        "name=oj-",
+        "--format",
+        "{{.Names}}",
+      ]);
+      const containers = stdout.trim().split("\n").filter(Boolean);
+      if (containers.length > 0) {
+        console.log(
+          `[Zombie Sweeper] Forcefully reaping ${containers.length} lingering judge container(s): ${containers.join(", ")}`
+        );
+        await execFileAsync("docker", ["rm", "-f", ...containers]);
+      }
+      return containers.length;
+    } catch (err: any) {
+      // If docker daemon is not available or error occurs, log warning
+      console.warn("[Zombie Sweeper] Warning during container cleanup:", err.message);
+      return 0;
+    }
+  }
+
+  /**
+   * Ephemeral Directory Sweeper: Deletes stale temporary folders in .temp/sandboxes
+   * older than maxAgeMs (default: 5 minutes) to prevent host disk exhaustion.
+   */
+  public static async sweepTempDirectories(
+    baseTempDir = path.resolve(process.cwd(), ".temp/sandboxes"),
+    maxAgeMs = 5 * 60 * 1000
+  ): Promise<number> {
+    let swept = 0;
+    try {
+      const exists = await fs.stat(baseTempDir).catch(() => null);
+      if (!exists) return 0;
+      const entries = await fs.readdir(baseTempDir);
+      const now = Date.now();
+      for (const entry of entries) {
+        const fullPath = path.join(baseTempDir, entry);
+        const stat = await fs.stat(fullPath).catch(() => null);
+        if (stat && now - stat.mtimeMs > maxAgeMs) {
+          await fs.rm(fullPath, { recursive: true, force: true }).catch(() => {});
+          swept++;
+        }
+      }
+    } catch {}
+    return swept;
+  }
+
+  /**
+   * Periodic Garbage Collection Worker Hook
+   */
+  public static startPeriodicSweeper(intervalMs = 30000): NodeJS.Timeout {
+    return setInterval(async () => {
+      await DockerSandboxExecutor.cleanupAllJudgeContainers();
+      await DockerSandboxExecutor.sweepTempDirectories();
+    }, intervalMs);
+  }
+
   public async compileCpp(
     sourceCode: string,
     sandboxDir: string,
-    timeoutMs = 10000
+    timeoutMs = 10000,
+    submissionId = randomUUID().substring(0, 8)
   ): Promise<{ success: boolean; error?: string; durationMs: number }> {
     const sourcePath = path.join(sandboxDir, "solution.cpp");
     await fs.writeFile(sourcePath, sourceCode, "utf8");
 
     const startTime = Date.now();
-    const containerName = `oj-compile-${randomUUID().substring(0, 8)}`;
+    const containerName = `oj-run-${submissionId}-compile`;
 
     const args = [
       "run",
@@ -107,6 +182,11 @@ export class DockerSandboxExecutor {
         error: errorOutput.trim() || err.message || "Compilation failed",
         durationMs,
       };
+    } finally {
+      // Forceful guarantee that compilation container is destroyed
+      try {
+        await execFileAsync("docker", ["rm", "-f", containerName]);
+      } catch {}
     }
   }
 
@@ -114,12 +194,13 @@ export class DockerSandboxExecutor {
     sandboxDir: string,
     testCase: TestCase,
     testCaseIndex: number,
-    config: SandboxConfig
+    config: SandboxConfig,
+    submissionId = randomUUID().substring(0, 8)
   ): Promise<TestCaseResult> {
     const inputPath = path.join(sandboxDir, "input.txt");
     await fs.writeFile(inputPath, testCase.input, "utf8");
 
-    const containerName = `oj-exec-${randomUUID().substring(0, 8)}`;
+    const containerName = `oj-run-${submissionId}-tc${testCaseIndex}`;
     const timeLimitSec = (config.timeLimitMs / 1000).toFixed(2);
     const hostWatchdogMs = config.timeLimitMs + 2500;
 
@@ -153,6 +234,12 @@ export class DockerSandboxExecutor {
 
     const startTime = Date.now();
 
+    const forceCleanupContainer = async () => {
+      try {
+        await execFileAsync("docker", ["rm", "-f", containerName]);
+      } catch {}
+    };
+
     return new Promise<TestCaseResult>((resolve) => {
       let isTimedOut = false;
       let stdoutBuffer = "";
@@ -166,6 +253,7 @@ export class DockerSandboxExecutor {
         // Host watchdog forceful container kill
         execFile("docker", ["kill", containerName], () => {
           child.kill("SIGKILL");
+          forceCleanupContainer();
         });
       }, hostWatchdogMs);
 
@@ -181,8 +269,10 @@ export class DockerSandboxExecutor {
         }
       });
 
-      child.on("close", (code) => {
+      child.on("close", async (code) => {
         clearTimeout(watchdogTimer);
+        await forceCleanupContainer();
+
         const executionTimeMs = Date.now() - startTime;
 
         let verdict: Verdict;
@@ -232,8 +322,9 @@ export class DockerSandboxExecutor {
         });
       });
 
-      child.on("error", (err) => {
+      child.on("error", async (err) => {
         clearTimeout(watchdogTimer);
+        await forceCleanupContainer();
         resolve({
           testCaseIndex,
           verdict: Verdict.INTERNAL_ERROR,
@@ -247,17 +338,19 @@ export class DockerSandboxExecutor {
   public async runSubmission(
     sourceCode: string,
     testCases: TestCase[],
-    config: SandboxConfig
+    config: SandboxConfig,
+    submissionId: string = randomUUID().substring(0, 8)
   ): Promise<ExecutionResult> {
     await this.init();
-    const sandboxDir = await this.createSandboxDir();
+    const sandboxDir = await this.createSandboxDir(submissionId);
 
     try {
       // 1. Compile Phase
       const compileResult = await this.compileCpp(
         sourceCode,
         sandboxDir,
-        config.compileTimeoutMs || 10000
+        config.compileTimeoutMs || 10000,
+        submissionId
       );
 
       if (!compileResult.success) {
@@ -283,7 +376,8 @@ export class DockerSandboxExecutor {
           sandboxDir,
           tc,
           i + 1,
-          config
+          config,
+          submissionId
         );
 
         testCaseResults.push(result);
@@ -307,8 +401,8 @@ export class DockerSandboxExecutor {
         testCaseResults,
       };
     } finally {
+      // Guaranteed cleanup of host temp directory in finally block
       await this.cleanupSandbox(sandboxDir);
     }
   }
 }
-

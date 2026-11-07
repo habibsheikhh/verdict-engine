@@ -4,6 +4,9 @@ import dotenv from "dotenv";
 import authRoutes from "./routes/authRoutes";
 import problemRoutes from "./routes/problemRoutes";
 import submissionRoutes from "./routes/submissionRoutes";
+import systemRoutes from "./routes/systemRoutes";
+import { prisma } from "./lib/prisma";
+import { submissionQueue, redisConnection } from "./queue/submissionQueue";
 
 dotenv.config();
 
@@ -23,6 +26,7 @@ app.get("/health", (_req: Request, res: Response) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/problems", problemRoutes);
 app.use("/api/submissions", submissionRoutes);
+app.use("/api/system", systemRoutes);
 
 // 404 Route handler
 app.use((_req: Request, res: Response) => {
@@ -35,10 +39,39 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   res.status(500).json({ error: "Internal server error", message: err.message });
 });
 
+let server: any = null;
+
+export const closeApiGracefully = async () => {
+  if (server) {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+  try {
+    await submissionQueue.close();
+  } catch {}
+  try {
+    await redisConnection.quit();
+  } catch {}
+  try {
+    await prisma.$disconnect();
+  } catch {}
+};
+
 if (process.env.NODE_ENV !== "test") {
-  app.listen(PORT, () => {
+  server = app.listen(PORT, () => {
     console.log(`[API Server] Running on http://localhost:${PORT}`);
   });
 }
+
+process.on("SIGINT", async () => {
+  console.log("\n[API Server] SIGINT received. Shutting down gracefully...");
+  await closeApiGracefully();
+  process.exit(0);
+});
+
+process.on("SIGTERM", async () => {
+  console.log("\n[API Server] SIGTERM received. Terminating gracefully...");
+  await closeApiGracefully();
+  process.exit(0);
+});
 
 export default app;

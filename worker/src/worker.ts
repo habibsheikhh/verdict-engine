@@ -74,7 +74,8 @@ export const startSubmissionWorker = () => {
         const result = await executor.runSubmission(
           submission.code,
           testCases,
-          sandboxConfig
+          sandboxConfig,
+          submission.id
         );
 
         // 4. Update submission in PostgreSQL with verdict & performance metrics
@@ -122,6 +123,23 @@ export const startSubmissionWorker = () => {
     console.error(`[Worker] Job ${job?.id} failed:`, err.message);
   });
 
-  return worker;
+  const close = async () => {
+    try {
+      await worker.close();
+    } catch {}
+    try {
+      await connection.quit();
+    } catch {}
+    try {
+      await prisma.$disconnect();
+    } catch {}
+  };
+
+  return {
+    worker,
+    connection,
+    executor,
+    close,
+  };
 };
 

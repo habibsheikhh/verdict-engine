@@ -9,6 +9,8 @@
     "dev": "tsx watch src/index.ts",
     "test": "tsx src/testPhase2.ts",
     "test:queue": "tsx src/testPhase4.ts",
+    "test:e2e": "tsx src/testPhase6.ts",
+    "test:stress": "tsx src/testStress.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:push": "prisma db push",
@@ -25,6 +27,7 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
+    "express-rate-limit": "^8.7.3",
     "ioredis": "^6.0.0",
     "jsonwebtoken": "^9.0.2",
     "zod": "^3.23.8"

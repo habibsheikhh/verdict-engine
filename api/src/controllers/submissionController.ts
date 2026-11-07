@@ -15,8 +15,12 @@ export const createSubmission = async (
 
     const parseResult = createSubmissionSchema.safeParse(req.body);
     if (!parseResult.success) {
-      res.status(400).json({
-        error: "Validation failed",
+      const codeError = parseResult.error.errors.find(
+        (e) => e.path.includes("code") && (e.code === "too_big" || e.message.includes("64KB"))
+      );
+      const status = codeError ? 413 : 400;
+      res.status(status).json({
+        error: codeError ? "Payload Too Large: Source code exceeds 64KB limit" : "Validation failed",
         details: parseResult.error.format(),
       });
       return;
