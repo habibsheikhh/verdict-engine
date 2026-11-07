@@ -1,27 +1,95 @@
 import React, { useState, useEffect } from "react";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+  useNavigate,
+  useParams,
+  Outlet,
+} from "react-router-dom";
 import { User } from "./types";
 import { api } from "./api";
 import { Navbar } from "./components/Navbar";
 import { ProblemList } from "./components/ProblemList";
 import { ProblemDetail } from "./components/ProblemDetail";
-import { AuthModal } from "./components/AuthModal";
+import { LandingPage } from "./pages/LandingPage";
+import { AuthPage } from "./pages/AuthPage";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 
-const getHashSlug = (): string | null => {
-  if (typeof window === "undefined") return null;
-  const hash = window.location.hash.replace(/^#\/?/, "").trim();
-  return hash || null;
+// ---------------------------------------------------------------------------
+// Route Wrapper for Problem Detail
+// ---------------------------------------------------------------------------
+interface ProblemDetailRouteProps {
+  user: User | null;
+  onOpenAuth: () => void;
+  onBack: () => void;
+}
+
+const ProblemDetailRoute: React.FC<ProblemDetailRouteProps> = ({
+  user,
+  onOpenAuth,
+  onBack,
+}) => {
+  const { slug } = useParams<{ slug: string }>();
+
+  return (
+    <ErrorBoundary onReset={onBack} fallbackTitle="Workspace Render Failed">
+      <ProblemDetail
+        slug={slug || ""}
+        user={user}
+        onOpenAuth={onOpenAuth}
+        onBack={onBack}
+      />
+    </ErrorBoundary>
+  );
 };
 
-export const App: React.FC = () => {
+// ---------------------------------------------------------------------------
+// Platform Layout: Strict wrapper that mounts Navbar ONLY for problem routes
+// ---------------------------------------------------------------------------
+interface PlatformLayoutProps {
+  user: User | null;
+  onOpenAuth: () => void;
+  onLogout: () => void;
+  onNavigateHome: () => void;
+  onNavigateLanding: () => void;
+}
+
+const PlatformLayout: React.FC<PlatformLayoutProps> = ({
+  user,
+  onOpenAuth,
+  onLogout,
+  onNavigateHome,
+  onNavigateLanding,
+}) => {
+  return (
+    <div className="min-h-screen flex flex-col bg-[#0a0a0c] text-[#ededef]">
+      <Navbar
+        user={user}
+        onOpenAuth={onOpenAuth}
+        onLogout={onLogout}
+        onNavigateHome={onNavigateHome}
+        onNavigateLanding={onNavigateLanding}
+      />
+      <main className="flex-1 flex flex-col">
+        <Outlet />
+      </main>
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// Main Router Application Content
+// ---------------------------------------------------------------------------
+const AppContent: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [isAuthOpen, setIsAuthOpen] = useState(false);
-  const [selectedProblemSlug, setSelectedProblemSlug] = useState<string | null>(getHashSlug);
+  const navigate = useNavigate();
 
   useEffect(() => {
     let mounted = true;
 
-    // Check if user is already authenticated
+    // Check existing auth session
     api
       .getMe()
       .then((user) => {
@@ -29,35 +97,17 @@ export const App: React.FC = () => {
       })
       .catch(() => {});
 
-    // Listen to hash changes for deep linking and browser Back/Forward navigation
-    const handleHashChange = () => {
-      const slug = getHashSlug();
-      setSelectedProblemSlug((prev) => (prev !== slug ? slug : prev));
-    };
-
-    window.addEventListener("hashchange", handleHashChange);
-    window.addEventListener("popstate", handleHashChange);
+    // Seamless migration for legacy hash URLs (e.g. #two-sum -> /problems/two-sum)
+    const hash = window.location.hash.replace(/^#\/?/, "").trim();
+    if (hash && !window.location.pathname.startsWith("/problems/")) {
+      window.location.hash = "";
+      navigate(`/problems/${hash}`, { replace: true });
+    }
 
     return () => {
       mounted = false;
-      window.removeEventListener("hashchange", handleHashChange);
-      window.removeEventListener("popstate", handleHashChange);
     };
-  }, []);
-
-  const handleSelectProblem = (slug: string) => {
-    setSelectedProblemSlug(slug);
-    if (window.location.hash !== `#${slug}` && window.location.hash !== slug) {
-      window.location.hash = slug;
-    }
-  };
-
-  const handleNavigateHome = () => {
-    setSelectedProblemSlug(null);
-    if (window.location.hash && window.location.hash !== "#") {
-      history.pushState(null, "", window.location.pathname);
-    }
-  };
+  }, [navigate]);
 
   const handleLogout = () => {
     api.logout();
@@ -65,41 +115,73 @@ export const App: React.FC = () => {
   };
 
   return (
-    <ErrorBoundary fallbackTitle="Platform Shell Error">
-      <div className="min-h-screen flex flex-col bg-[#0a0a0c] text-[#ededef]">
-        <Navbar
-          user={currentUser}
-          onOpenAuth={() => setIsAuthOpen(true)}
-          onLogout={handleLogout}
-          onNavigateHome={handleNavigateHome}
-        />
+    <Routes>
+      {/* 1. Landing Page: Completely bare, ZERO top navigation elements */}
+      <Route
+        path="/"
+        element={
+          <ErrorBoundary fallbackTitle="Landing Page Error">
+            <LandingPage user={currentUser} />
+          </ErrorBoundary>
+        }
+      />
 
-        <main className="flex-1">
-          {selectedProblemSlug ? (
-            <ErrorBoundary
-              onReset={handleNavigateHome}
-              fallbackTitle="Workspace Render Failed"
-            >
-              <ProblemDetail
-                slug={selectedProblemSlug}
-                user={currentUser}
-                onOpenAuth={() => setIsAuthOpen(true)}
-                onBack={handleNavigateHome}
+      {/* 2. Authentication Page: Dedicated centered card, ZERO navbar */}
+      <Route
+        path="/login"
+        element={
+          <ErrorBoundary fallbackTitle="Authentication Error">
+            <AuthPage onSuccess={(user) => setCurrentUser(user)} />
+          </ErrorBoundary>
+        }
+      />
+
+      {/* 3. Platform Shell: Navbar is mounted ONLY for /problems and /problems/:slug */}
+      <Route
+        element={
+          <PlatformLayout
+            user={currentUser}
+            onOpenAuth={() => navigate("/login")}
+            onLogout={handleLogout}
+            onNavigateHome={() => navigate("/problems")}
+            onNavigateLanding={() => navigate("/")}
+          />
+        }
+      >
+        <Route
+          path="/problems"
+          element={
+            <ErrorBoundary fallbackTitle="Problem Explorer Error">
+              <ProblemList
+                onSelectProblem={(slug) => navigate(`/problems/${slug}`)}
               />
             </ErrorBoundary>
-          ) : (
-            <ErrorBoundary fallbackTitle="Problem Explorer Error">
-              <ProblemList onSelectProblem={handleSelectProblem} />
-            </ErrorBoundary>
-          )}
-        </main>
-
-        <AuthModal
-          isOpen={isAuthOpen}
-          onClose={() => setIsAuthOpen(false)}
-          onSuccess={(user) => setCurrentUser(user)}
+          }
         />
-      </div>
+        <Route
+          path="/problems/:slug"
+          element={
+            <ProblemDetailRoute
+              user={currentUser}
+              onOpenAuth={() => navigate("/login")}
+              onBack={() => navigate("/problems")}
+            />
+          }
+        />
+      </Route>
+
+      {/* Fallback Catch-all: Redirect unknown routes back to Landing */}
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+};
+
+export const App: React.FC = () => {
+  return (
+    <ErrorBoundary fallbackTitle="Application Shell Error">
+      <BrowserRouter>
+        <AppContent />
+      </BrowserRouter>
     </ErrorBoundary>
   );
 };

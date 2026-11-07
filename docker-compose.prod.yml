@@ -1,0 +1,112 @@
+# =============================================================================
+# Production Docker Compose for Verdict Engine Backend (Ubuntu ARM / x86_64 VPS)
+# =============================================================================
+# Usage:
+#   docker compose -f docker-compose.prod.yml up -d --build
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # 1. PostgreSQL Database Service
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: verdict_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgrespassword}
+      POSTGRES_DB: ${POSTGRES_DB:-online_judge}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-online_judge}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - verdict_net
+
+  # ---------------------------------------------------------------------------
+  # 2. Redis In-Memory Queue Store
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: verdict_redis
+    restart: always
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - verdict_net
+
+  # ---------------------------------------------------------------------------
+  # 3. Verdict Engine Express API
+  # ---------------------------------------------------------------------------
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile.prod
+    container_name: verdict_api
+    restart: always
+    ports:
+      # Maps standard HTTP port 80 to container port 5000 (accessible by Vercel frontend)
+      - "${API_HOST_PORT:-80}:5000"
+    environment:
+      PORT: 5000
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgrespassword}@postgres:5432/${POSTGRES_DB:-online_judge}?schema=public
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-super-secret-jwt-key-oj-2025}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - verdict_net
+
+  # ---------------------------------------------------------------------------
+  # 4. Sandboxed Execution Worker Engine
+  # ---------------------------------------------------------------------------
+  worker:
+    build:
+      context: ./worker
+      dockerfile: Dockerfile.prod
+    container_name: verdict_worker
+    restart: always
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgrespassword}@postgres:5432/${POSTGRES_DB:-online_judge}?schema=public
+      REDIS_URL: redis://redis:6379
+    volumes:
+      # CRITICAL: Mount host Docker socket so the worker spawns isolated C++ sandboxes
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Shared sandbox workspace mounted at identical container/host paths for sibling container volume mounts
+      - /app/.temp/sandboxes:/app/.temp/sandboxes
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - verdict_net
+
+# -----------------------------------------------------------------------------
+# Persistent Volumes & Network Definitions
+# -----------------------------------------------------------------------------
+volumes:
+  postgres_data:
+    name: verdict_postgres_data
+  redis_data:
+    name: verdict_redis_data
+
+networks:
+  verdict_net:
+    name: verdict_network
+    driver: bridge

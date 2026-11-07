@@ -17,6 +17,7 @@ interface NavbarProps {
   onOpenAuth: () => void;
   onLogout: () => void;
   onNavigateHome: () => void;
+  onNavigateLanding?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -24,6 +25,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenAuth,
   onLogout,
   onNavigateHome,
+  onNavigateLanding,
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -45,14 +47,14 @@ export const Navbar: React.FC<NavbarProps> = ({
       {/* Left: Brand & Engine Status */}
       <div className="flex items-center gap-4 sm:gap-6">
         <button
-          onClick={onNavigateHome}
+          onClick={onNavigateLanding || onNavigateHome}
           className="flex items-center gap-2.5 text-zinc-100 font-semibold text-sm hover:opacity-90 transition-opacity focus:outline-none"
         >
-          <div className="h-7 w-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+          <div className="h-7 w-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shadow-sm shadow-emerald-500/10">
             <Terminal size={14} className="stroke-[2.5]" />
           </div>
-          <span className="tracking-tight font-bold text-sm text-zinc-100 flex items-center gap-1">
-            Judge<span className="text-emerald-400">Core</span>
+          <span className="bg-gradient-to-b from-white to-zinc-400 bg-clip-text text-transparent font-extrabold tracking-tighter text-sm">
+            Verdict Engine
           </span>
         </button>
 
@@ -137,9 +139,11 @@ export const Navbar: React.FC<NavbarProps> = ({
             <SheetContent side="right" className="bg-zinc-950 border-white/[0.08] flex flex-col justify-between">
               <div className="space-y-6 pt-4">
                 <SheetHeader>
-                  <SheetTitle className="text-left text-zinc-100 flex items-center gap-2">
+                  <SheetTitle className="text-left flex items-center gap-2">
                     <Terminal size={16} className="text-emerald-400" />
-                    JudgeCore
+                    <span className="bg-gradient-to-b from-white to-zinc-400 bg-clip-text text-transparent font-extrabold tracking-tighter text-base">
+                      Verdict Engine
+                    </span>
                   </SheetTitle>
                   <SheetDescription className="sr-only">
                     Mobile navigation options and session details

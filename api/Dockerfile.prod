@@ -1,0 +1,58 @@
+# =============================================================================
+# Production Dockerfile for Verdict Engine API (Express + TypeScript + Prisma)
+# Multi-stage build for minimal image size and fast startup on ARM64 / x86_64
+# =============================================================================
+
+# Stage 1: Build & Compile TypeScript
+FROM node:20-slim AS builder
+WORKDIR /app
+
+# Install OpenSSL for Prisma client generation
+RUN apt-get update && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
+
+# Copy dependency manifests
+COPY package*.json ./
+COPY prisma ./prisma/
+
+# Install full dependencies (including devDependencies for tsc)
+RUN npm ci
+
+# Copy TypeScript configuration and source code
+COPY tsconfig.json ./
+COPY src ./src
+
+# Generate Prisma Client and build compiled JavaScript
+RUN npx prisma generate && npm run build
+
+# -----------------------------------------------------------------------------
+# Stage 2: Production Runtime
+# -----------------------------------------------------------------------------
+FROM node:20-slim AS runner
+WORKDIR /app
+
+# Install OpenSSL required by Prisma engine runtime
+RUN apt-get update && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
+
+ENV NODE_ENV=production
+ENV PORT=5000
+
+# Copy dependency manifests
+COPY package*.json ./
+COPY prisma ./prisma/
+
+# Install only production dependencies
+RUN npm ci --only=production && npx prisma generate
+
+# Copy compiled JavaScript output from builder stage
+COPY --from=builder /app/dist ./dist
+
+# Expose API application port
+EXPOSE 5000
+
+# Health check
+HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \
+  CMD node -e "fetch('http://localhost:5000/health').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"
+
+# Start the compiled Express production server
+CMD ["npm", "run", "start"]
+
