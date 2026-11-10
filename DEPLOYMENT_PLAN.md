@@ -163,7 +163,8 @@ newgrp docker
    * Pre-pulls `gcc:latest` compiler image (sub-second cold start for submissions).
    * Launches PostgreSQL and Redis containers (saving you $50+/month on AWS RDS/ElastiCache).
    * Launches the Express API and sandboxed BullMQ worker.
-   * Runs Prisma migrations and seeds 10 algorithmic problems + demo users.
+   * Synchronizes the Prisma schema (`prisma db push`) to ensure database tables are created.
+   * *(Note: Seeding is deliberately excluded from `deploy.sh` to protect production databases. To seed manually on dev/staging, run `npm run seed` from root or `npx tsx prisma/seed.ts` inside the api folder).*
    * Performs an instant health check.
 
 ---

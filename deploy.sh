@@ -10,8 +10,6 @@
 
 set -e # Exit immediately on error
 
-echo "HEEEEEEEEEEEEEEEELLLOOOOOOOOOOOOOOOOOOOOOO"
-
 echo "======================================================"
 echo "🚀 Starting Verdict Engine Production Deployment..."
 echo "======================================================"
@@ -67,12 +65,9 @@ done
 
 echo "✅ API service is healthy!"
 
-# 7. Apply Prisma Schema & Seed Production Problems
+# 7. Apply Prisma Database Schema
 echo "📦 Synchronizing Prisma database schema..."
 docker compose -f docker-compose.prod.yml exec -T api npx prisma db push --skip-generate
-
-echo "🌱 Ensuring 10 classic challenges and demo users are seeded..."
-docker compose -f docker-compose.prod.yml exec -T api npm run prisma:seed
 
 # 8. Final Health Check Verification
 echo "🩺 Running live health check..."
