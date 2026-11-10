@@ -10,6 +10,8 @@
 
 set -e # Exit immediately on error
 
+echo "HEEEEEEEEEEEEEEEELLLOOOOOOOOOOOOOOOOOOOOOO"
+
 echo "======================================================"
 echo "🚀 Starting Verdict Engine Production Deployment..."
 echo "======================================================"
