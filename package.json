@@ -1,0 +1,16 @@
+{
+  "name": "verdict-engine",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Verdict Engine — High-Performance Sandboxed Code Execution Platform",
+  "scripts": {
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "dev:api": "npm --prefix api run dev",
+    "dev:worker": "npm --prefix worker run dev",
+    "dev:client": "npm --prefix client run dev",
+    "build": "npm --prefix api run build && npm --prefix worker run build && npm --prefix client run build",
+    "seed": "npm --prefix api run prisma:seed"
+  }
+}
+

@@ -14,10 +14,12 @@ echo "======================================================"
 echo "🚀 Starting Verdict Engine Production Deployment..."
 echo "======================================================"
 
-# 1. Pull Latest Code from Git
-echo "📥 Pulling latest commits from origin main..."
-git fetch origin main
-git reset --hard origin/main
+# 1. Pull Latest Code from Git (if in a Git repo)
+if git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
+  echo "📥 Pulling latest commits from origin..."
+  git fetch origin main 2>/dev/null || true
+  git reset --hard origin/main 2>/dev/null || true
+fi
 
 # 2. Ensure Host Sandboxing Directory Exists
 # This directory is mounted at /app/.temp/sandboxes on both the worker
@@ -72,12 +74,13 @@ docker compose -f docker-compose.prod.yml exec -T api npm run prisma:seed
 
 # 8. Final Health Check Verification
 echo "🩺 Running live health check..."
-HEALTH_STATUS=$(curl -s http://localhost:${API_HOST_PORT:-80}/health || echo "FAILED")
+HEALTH_STATUS=$(curl -s http://localhost:${APP_PORT:-80}/health || echo "FAILED")
 echo "Health Response: $HEALTH_STATUS"
 
 echo "======================================================"
-echo "🎉 Verdict Engine deployed successfully!"
-echo "📡 Public API endpoint: http://<YOUR_VPS_PUBLIC_IP>:${API_HOST_PORT:-80}"
-echo "🔒 Configure your Vercel frontend to point API calls to this address."
+echo "🎉 Verdict Engine deployed successfully on AWS EC2!"
+echo "🌐 Web App URL: http://<YOUR_EC2_PUBLIC_IP>:${APP_PORT:-80}"
+echo "📡 API Health Status: http://<YOUR_EC2_PUBLIC_IP>:${APP_PORT:-80}/health"
+echo "✨ Full stack (Frontend + API + Worker + DB + Redis) is online!"
 echo "======================================================"
 

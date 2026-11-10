@@ -1,6 +1,7 @@
 import { Problem, Submission, User } from "./types";
 
 const TOKEN_KEY = "oj_auth_token";
+const API_BASE = (import.meta.env.VITE_API_URL || "").replace(/\/+$/, "");
 
 export const getStoredToken = (): string | null => {
   return localStorage.getItem(TOKEN_KEY);
@@ -28,7 +29,7 @@ const getHeaders = (): HeadersInit => {
 export const api = {
   // Auth
   async login(email: string, password: string): Promise<{ user: User; token: string }> {
-    const res = await fetch("/api/auth/login", {
+    const res = await fetch(`${API_BASE}/api/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
@@ -44,7 +45,7 @@ export const api = {
     password: string,
     name: string
   ): Promise<{ user: User; token: string }> {
-    const res = await fetch("/api/auth/register", {
+    const res = await fetch(`${API_BASE}/api/auth/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password, name }),
@@ -59,7 +60,7 @@ export const api = {
     const token = getStoredToken();
     if (!token) return null;
     try {
-      const res = await fetch("/api/auth/me", {
+      const res = await fetch(`${API_BASE}/api/auth/me`, {
         headers: getHeaders(),
       });
       if (!res.ok) {
@@ -80,7 +81,7 @@ export const api = {
   // Problems
   async getProblems(difficulty?: string): Promise<Problem[]> {
     const query = difficulty ? `?difficulty=${difficulty}` : "";
-    const res = await fetch(`/api/problems${query}`, {
+    const res = await fetch(`${API_BASE}/api/problems${query}`, {
       headers: getHeaders(),
     });
     const data = await res.json();
@@ -89,7 +90,7 @@ export const api = {
   },
 
   async getProblemBySlug(slug: string): Promise<{ problem: Problem; hasHiddenTestCasesOmitted: boolean }> {
-    const res = await fetch(`/api/problems/${slug}`, {
+    const res = await fetch(`${API_BASE}/api/problems/${slug}`, {
       headers: getHeaders(),
     });
     const data = await res.json();
@@ -99,7 +100,7 @@ export const api = {
 
   // Submissions
   async createSubmission(problemId: string, code: string, language = "cpp"): Promise<Submission> {
-    const res = await fetch("/api/submissions", {
+    const res = await fetch(`${API_BASE}/api/submissions`, {
       method: "POST",
       headers: getHeaders(),
       body: JSON.stringify({ problemId, code, language }),
@@ -110,7 +111,7 @@ export const api = {
   },
 
   async getSubmissionById(id: string): Promise<Submission> {
-    const res = await fetch(`/api/submissions/${id}`, {
+    const res = await fetch(`${API_BASE}/api/submissions/${id}`, {
       headers: getHeaders(),
     });
     const data = await res.json();
@@ -120,7 +121,7 @@ export const api = {
 
   async getSubmissions(problemId?: string): Promise<Submission[]> {
     const query = problemId ? `?problemId=${problemId}` : "";
-    const res = await fetch(`/api/submissions${query}`, {
+    const res = await fetch(`${API_BASE}/api/submissions${query}`, {
       headers: getHeaders(),
     });
     const data = await res.json();
