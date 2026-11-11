@@ -1,14 +1,18 @@
+import path from "path";
+import dotenv from "dotenv";
+
+dotenv.config();
+dotenv.config({ path: path.resolve(__dirname, "../../.env") });
+dotenv.config({ path: path.resolve(process.cwd(), "../.env") });
+
 import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
-import dotenv from "dotenv";
 import authRoutes from "./routes/authRoutes";
 import problemRoutes from "./routes/problemRoutes";
 import submissionRoutes from "./routes/submissionRoutes";
 import systemRoutes from "./routes/systemRoutes";
 import { prisma } from "./lib/prisma";
 import { submissionQueue, redisConnection } from "./queue/submissionQueue";
-
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;

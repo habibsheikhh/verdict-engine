@@ -1,11 +1,15 @@
+import path from "path";
+import dotenv from "dotenv";
+
+dotenv.config();
+dotenv.config({ path: path.resolve(__dirname, "../../.env") });
+dotenv.config({ path: path.resolve(process.cwd(), "../.env") });
+
 import { Worker, Job } from "bullmq";
 import Redis from "ioredis";
-import dotenv from "dotenv";
 import { prisma } from "./lib/prisma";
 import { DockerSandboxExecutor } from "./sandbox/executor";
 import { SandboxConfig } from "./sandbox/types";
-
-dotenv.config();
 
 const REDIS_URL = process.env.REDIS_URL || "redis://localhost:6379";
 export const SUBMISSION_QUEUE_NAME = "submission-queue";
